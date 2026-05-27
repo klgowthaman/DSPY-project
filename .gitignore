@@ -22,3 +22,29 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment Files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+backend/venv/
+backend/.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.pytest_cache/
+.chroma/
+
+# Build artifacts
+dist/
+dist-ssr/
+build/
+
