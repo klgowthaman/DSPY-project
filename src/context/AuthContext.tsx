@@ -64,6 +64,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
+    if (!backendOnline) {
+      console.warn("Backend offline, using mock login fallback");
+      const matchedQuick = [
+        { name: 'Alex Chen', role: 'admin' as const, email: 'alex.chen@company.com' },
+        { name: 'Sarah Kim', role: 'engineer' as const, email: 'sarah.kim@company.com' },
+        { name: 'Marcus Webb', role: 'viewer' as const, email: 'marcus.webb@company.com' },
+      ].find(q => q.email === email);
+
+      const u = matchedQuick || {
+        name: email.split('@')[0],
+        email: email,
+        role: 'admin' as const,
+      };
+
+      const resolved: User = {
+        id: 'demo-user-id',
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        avatar: u.name.slice(0, 2).toUpperCase(),
+        workspaceId: 'demo-workspace',
+      };
+      
+      localStorage.setItem('ima_token', 'mock-token');
+      localStorage.setItem('ima_user', JSON.stringify({
+        id: resolved.id,
+        name: resolved.name,
+        email: resolved.email,
+        role: resolved.role,
+        avatar: resolved.avatar,
+        workspace_id: resolved.workspaceId,
+      }));
+      setUser(resolved);
+      setWorkspace(DEMO_WORKSPACE);
+      return;
+    }
+
     const data = await authService.login({ email, password });
     const u = data.user;
     const resolved: User = {
@@ -79,6 +116,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signup = async (name: string, email: string, password: string, company?: string) => {
+    if (!backendOnline) {
+      console.warn("Backend offline, using mock signup fallback");
+      const resolved: User = {
+        id: 'demo-user-id',
+        name: name,
+        email: email,
+        role: 'admin',
+        avatar: name.slice(0, 2).toUpperCase(),
+        workspaceId: 'demo-workspace',
+      };
+      localStorage.setItem('ima_token', 'mock-token');
+      localStorage.setItem('ima_user', JSON.stringify({
+        id: resolved.id,
+        name: resolved.name,
+        email: resolved.email,
+        role: resolved.role,
+        avatar: resolved.avatar,
+        workspace_id: resolved.workspaceId,
+      }));
+      setUser(resolved);
+      setWorkspace({ ...DEMO_WORKSPACE, name: `${company || name} Workspace` });
+      return;
+    }
+
     const data = await authService.signup({ name, email, password, company });
     const u = data.user;
     const resolved: User = {

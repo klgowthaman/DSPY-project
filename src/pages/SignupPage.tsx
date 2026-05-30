@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 const SignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { signup } = useAuth();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({ name: '', email: '', company: '', workspace: '' });
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ const SignupPage: React.FC = () => {
   const handleSubmit = async () => {
     setLoading(true);
     await new Promise(r => setTimeout(r, 1200));
-    login(formData.email || 'new@company.com', 'admin');
+    await signup(formData.name || 'Alex Chen', formData.email || 'new@company.com', 'password123', formData.company);
     navigate('/dashboard');
   };
 

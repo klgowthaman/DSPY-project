@@ -17,7 +17,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     await new Promise(r => setTimeout(r, 800));
-    login(email, role);
+    login(email, password);
     navigate('/dashboard');
   };
 

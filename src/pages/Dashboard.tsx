@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   FolderOpen, GitBranch, Ticket, Hash, MessageSquare, BarChart3,
@@ -17,6 +17,36 @@ const iconMap: Record<string, React.ElementType> = {
 const Dashboard: React.FC = () => {
   const { user, workspace } = useAuth();
   const navigate = useNavigate();
+  const [integrations, setIntegrations] = useState(mockIntegrations);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [metrics, setMetrics] = useState(mockMetrics);
+
+  const handleSyncAll = async () => {
+    setIsSyncingAll(true);
+    setIntegrations(prev => prev.map(i => ({ ...i, status: 'syncing' })));
+    
+    await new Promise(r => setTimeout(r, 2000));
+    
+    setIntegrations(prev => prev.map(i => ({
+      ...i,
+      status: 'connected',
+      lastSync: 'just now',
+      itemsIndexed: i.itemsIndexed + Math.floor(Math.random() * 500) + 100
+    })));
+    
+    // Also mock update some metrics to show data loaded
+    setMetrics(prev => prev.map(m => {
+      if (m.id === 'm1') return { ...m, value: '4' }; // 4 projects
+      if (m.id === 'm2') return { ...m, value: '18' }; // 18 repos
+      if (m.id === 'm3') return { ...m, value: '2,450' }; // 2,450 Jira tickets
+      if (m.id === 'm4') return { ...m, value: '5,810' }; // 5,810 Slack threads
+      if (m.id === 'm5') return { ...m, value: '42' }; // 42 AI queries
+      if (m.id === 'm6') return { ...m, value: '88%' }; // 88% knowledge score
+      return m;
+    }));
+    
+    setIsSyncingAll(false);
+  };
 
   const statusVariant = (s: string): 'green' | 'orange' | 'red' => {
     if (s === 'healthy' || s === 'connected') return 'green';
@@ -36,14 +66,19 @@ const Dashboard: React.FC = () => {
             {workspace?.name} · {workspace?.memberCount} members · {workspace?.projectCount} projects
           </p>
         </div>
-        <button className="btn-secondary flex items-center gap-2 text-sm py-2 px-4">
-          <RefreshCw size={13} /> Sync All
+        <button 
+          onClick={handleSyncAll}
+          disabled={isSyncingAll}
+          className="btn-secondary flex items-center gap-2 text-sm py-2 px-4"
+        >
+          <RefreshCw size={13} className={isSyncingAll ? 'animate-spin' : ''} />
+          {isSyncingAll ? 'Syncing...' : 'Sync All'}
         </button>
       </div>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {mockMetrics.map((metric, i) => {
+        {metrics.map((metric, i) => {
           const Icon = iconMap[metric.id] || Activity;
           const sparkData = metric.sparkline.map((v) => ({ v }));
           const isPositive = metric.changeType === 'positive';
@@ -134,7 +169,7 @@ const Dashboard: React.FC = () => {
             <button onClick={() => navigate('/integrations')} className="text-xs text-accent-blue hover:underline">Manage</button>
           </div>
           <div className="space-y-3">
-            {mockIntegrations.map(int => (
+            {integrations.map(int => (
               <div key={int.id} className="flex items-center gap-3 p-3 bg-bg-elevated rounded-xl border border-white/5">
                 <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
                   <span className="text-sm">
@@ -150,7 +185,7 @@ const Dashboard: React.FC = () => {
             ))}
           </div>
           <div className="mt-4 p-3 bg-accent-green/5 rounded-xl border border-accent-green/10 text-xs text-accent-green">
-            3 of 4 integrations healthy
+            {integrations.filter(i => i.status !== 'error').length} of {integrations.length} integrations healthy
           </div>
         </div>
       </div>

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   GitBranch, Ticket, Hash, BookOpen, RefreshCw, Plus, Trash2,
-  CheckCircle, Clock, AlertTriangle, Upload, Key, Settings
+  CheckCircle, Clock, AlertTriangle, Upload, Key, Settings, Check
 } from 'lucide-react';
 import { mockIntegrations } from '../data/mockData';
 import type { Integration } from '../types';
@@ -37,7 +37,25 @@ const IntegrationsPage: React.FC = () => {
   const isAdmin = user?.role === 'admin';
   const [integrations, setIntegrations] = useState<Integration[]>(mockIntegrations);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [apiKeyOpen, setApiKeyOpen] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
+  
+  // API Keys state
+  const [keys, setKeys] = useState({
+    github: 'ghp_••••••••••••••••••••••••••••',
+    jira: 'jira_••••••••••••••••••••••••••••',
+    slack: 'xoxb-••••••••••••••••••••••••••••',
+  });
+  const [keySaved, setKeySaved] = useState(false);
+
+  const handleSaveKeys = (e: React.FormEvent) => {
+    e.preventDefault();
+    setKeySaved(true);
+    setTimeout(() => {
+      setKeySaved(false);
+      setApiKeyOpen(false);
+    }, 1500);
+  };
 
   const handleSync = async (id: string) => {
     setSyncing(id);
@@ -62,7 +80,7 @@ const IntegrationsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 animate-fade-in relative">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -70,7 +88,7 @@ const IntegrationsPage: React.FC = () => {
           <p className="text-text-secondary text-sm mt-1">Connect your engineering tools and manage data indexing</p>
         </div>
         {isAdmin && (
-          <button className="btn-primary flex items-center gap-2 text-sm py-2 px-4">
+          <button onClick={() => setApiKeyOpen(true)} className="btn-primary flex items-center gap-2 text-sm py-2 px-4">
             <Key size={13} /> API Keys
           </button>
         )}
@@ -205,28 +223,89 @@ const IntegrationsPage: React.FC = () => {
         })}
       </div>
 
-      {/* Upload Modal */}
-      {uploadOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass rounded-2xl p-8 max-w-md w-full mx-4"
-          >
-            <h3 className="font-bold text-lg mb-2">Upload Runbooks</h3>
-            <p className="text-sm text-text-secondary mb-6">Upload Markdown, PDF, or text files to index as runbooks.</p>
-            <div className="border-2 border-dashed border-white/15 rounded-xl p-8 text-center mb-4 hover:border-accent-blue/30 transition-colors cursor-pointer">
-              <Upload size={24} className="text-text-muted mx-auto mb-3" />
-              <p className="text-sm text-text-secondary">Drop files here or click to browse</p>
-              <p className="text-xs text-text-muted mt-1">Supports .md, .pdf, .txt — Max 50MB</p>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setUploadOpen(false)} className="btn-secondary flex-1 py-2">Cancel</button>
-              <button onClick={() => setUploadOpen(false)} className="btn-primary flex-1 py-2">Upload & Index</button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      {/* Modals */}
+      <AnimatePresence>
+        {/* Upload Modal */}
+        {uploadOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass rounded-2xl p-8 max-w-md w-full mx-4 border border-white/10"
+            >
+              <h3 className="font-bold text-lg mb-2">Upload Runbooks</h3>
+              <p className="text-sm text-text-secondary mb-6">Upload Markdown, PDF, or text files to index as runbooks.</p>
+              <div className="border-2 border-dashed border-white/15 rounded-xl p-8 text-center mb-4 hover:border-accent-blue/30 transition-colors cursor-pointer">
+                <Upload size={24} className="text-text-muted mx-auto mb-3" />
+                <p className="text-sm text-text-secondary">Drop files here or click to browse</p>
+                <p className="text-xs text-text-muted mt-1">Supports .md, .pdf, .txt — Max 50MB</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setUploadOpen(false)} className="btn-secondary flex-1 py-2">Cancel</button>
+                <button onClick={() => setUploadOpen(false)} className="btn-primary flex-1 py-2">Upload & Index</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* API Keys Modal */}
+        {apiKeyOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass rounded-2xl p-8 max-w-md w-full mx-4 border border-white/10"
+            >
+              <h3 className="font-bold text-lg mb-2 text-text-primary flex items-center gap-2">
+                <Key size={18} className="text-accent-blue" />
+                API Key Credentials
+              </h3>
+              <p className="text-sm text-text-secondary mb-6">Configure access tokens for third-party integrations. Keys are encrypted at rest.</p>
+              
+              <form onSubmit={handleSaveKeys} className="space-y-4">
+                <div>
+                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">GitHub Personal Access Token</label>
+                  <input
+                    type="text"
+                    value={keys.github}
+                    onChange={e => setKeys({ ...keys, github: e.target.value })}
+                    className="w-full bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-blue/40 transition-all text-text-primary font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">Jira API Token</label>
+                  <input
+                    type="text"
+                    value={keys.jira}
+                    onChange={e => setKeys({ ...keys, jira: e.target.value })}
+                    className="w-full bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-blue/40 transition-all text-text-primary font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">Slack Bot User OAuth Token</label>
+                  <input
+                    type="text"
+                    value={keys.slack}
+                    onChange={e => setKeys({ ...keys, slack: e.target.value })}
+                    className="w-full bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-blue/40 transition-all text-text-primary font-mono"
+                  />
+                </div>
+                
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setApiKeyOpen(false)} className="btn-secondary flex-1 py-2">
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary flex-1 py-2 flex items-center justify-center gap-1.5">
+                    {keySaved ? <><Check size={14} /> Saved!</> : <><Check size={14} /> Save Credentials</>}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Indexing Queue */}
       <GlassCard hover={false}>
