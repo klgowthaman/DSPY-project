@@ -42,8 +42,10 @@ curl -sf http://localhost:8000/health && echo " ✅ Backend online" || echo " �
 # Start Vite frontend
 echo ""
 echo "⚡ Starting Vite frontend on http://localhost:5173 ..."
+cd frontend
 npm run dev &
 FRONTEND_PID=$!
+cd ..
 
 echo ""
 echo "================================"

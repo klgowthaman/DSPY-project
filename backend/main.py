@@ -9,7 +9,7 @@ import logging
 from config import settings
 from database import connect_db, disconnect_db
 from vector_store import init_vector_store
-from routers import auth, projects, integrations, ai, analytics, team, workspaces
+from routers import auth, projects, ai, analytics, team, workspaces
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,8 +42,8 @@ app = FastAPI(
 # -------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -54,7 +54,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(workspaces.router)
 app.include_router(projects.router)
-app.include_router(integrations.router)
+
 app.include_router(ai.router)
 app.include_router(analytics.router)
 app.include_router(team.router)

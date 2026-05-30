@@ -22,11 +22,8 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
   { label: 'AI Assistant', icon: MessageSquare, path: '/ai', badge: 3 },
   { label: 'Projects', icon: FolderOpen, path: '/projects' },
-  { label: 'Knowledge Graph', icon: Network, path: '/knowledge-graph' },
-  { label: 'GitHub', icon: GitBranch, path: '/integrations' },
-  { label: 'Jira', icon: Ticket, path: '/integrations' },
-  { label: 'Slack', icon: Hash, path: '/integrations' },
-  { label: 'Runbooks', icon: BookOpen, path: '/integrations' },
+
+
   { label: 'Analytics', icon: BarChart3, path: '/analytics' },
   { label: 'Team', icon: Users, path: '/settings', adminOnly: true },
   { label: 'Settings', icon: Settings, path: '/settings' },
@@ -43,17 +40,7 @@ const Sidebar: React.FC = () => {
     return true;
   });
 
-  // Deduplicate integration links to a single "Integrations"
-  const deduped: NavItem[] = [];
-  const integrationAdded = { flag: false };
-  filteredNav.forEach(item => {
-    if (['/integrations'].includes(item.path) && !integrationAdded.flag) {
-      deduped.push({ label: 'Integrations', icon: Zap, path: '/integrations' });
-      integrationAdded.flag = true;
-    } else if (item.path !== '/integrations') {
-      deduped.push(item);
-    }
-  });
+  const deduped = filteredNav;
 
   return (
     <motion.aside

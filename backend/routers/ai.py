@@ -1,7 +1,6 @@
 """AI query router — SSE streaming DSPy agent endpoint."""
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 import logging
@@ -9,15 +8,29 @@ import logging
 from auth import get_current_user
 from database import get_collection
 from agents.dspy_agent import run_agent_query
+from schemas.ai import QueryRequest
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 logger = logging.getLogger(__name__)
 
+def _decrypt_token(encrypted_token: str) -> str:
+    if not encrypted_token:
+        return ""
+    try:
+        from cryptography.fernet import Fernet
+        from config import settings
+        import base64
+        key = settings.encryption_key.encode()
+        key = base64.urlsafe_b64encode(key.ljust(32)[:32])
+        f = Fernet(key)
+        return f.decrypt(encrypted_token.encode()).decode()
+    except Exception:
+        import base64
+        try:
+            return base64.b64decode(encrypted_token.encode()).decode()
+        except:
+            return ""
 
-class QueryRequest(BaseModel):
-    question: str
-    project_id: Optional[str] = None
-    workspace_id: Optional[str] = None
 
 
 @router.post("/query")
@@ -46,6 +59,27 @@ async def query_agent(
         except Exception:
             pass
 
+    github_token = ""
+    repo_url = ""
+    llm_api_key = None
+
+    if body.project_id:
+        projects = get_collection("projects")
+        if projects is not None:
+            try:
+                from bson import ObjectId
+                project_doc = await projects.find_one({"_id": ObjectId(body.project_id)})
+                if project_doc:
+                    repo_url = project_doc.get("repo_url", "")
+                    enc_token = project_doc.get("github_token_encrypted")
+                    if enc_token:
+                        github_token = _decrypt_token(enc_token)
+                    enc_llm_token = project_doc.get("llm_api_key_encrypted")
+                    if enc_llm_token:
+                        llm_api_key = _decrypt_token(enc_llm_token)
+            except Exception as e:
+                logger.error(f"Error fetching project: {e}")
+
     # Save query to history
     query_history = get_collection("query_history")
     if query_history is not None:
@@ -62,6 +96,9 @@ async def query_agent(
             question=body.question,
             workspace_id=workspace_id,
             workspace_name=workspace_name,
+            github_token=github_token,
+            repo_url=repo_url,
+            llm_api_key=llm_api_key,
         ):
             yield chunk
 

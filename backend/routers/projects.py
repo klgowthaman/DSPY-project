@@ -1,12 +1,12 @@
 """Projects router — CRUD for workspace projects."""
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from bson import ObjectId
 
 from auth import get_current_user
 from database import get_collection
+from schemas.projects import CreateProjectRequest, UpdateProjectIntegrationsRequest
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -18,12 +18,6 @@ MOCK_PROJECTS = [
     {"id": "p5", "name": "data-pipeline", "description": "ETL pipeline for analytics", "language": "Python", "stars": 19, "last_activity": "6 hours ago", "status": "healthy", "pr_count": 12, "jira_count": 31, "slack_activity": 312},
 ]
 
-
-class CreateProjectRequest(BaseModel):
-    name: str
-    description: str = ""
-    language: str = "Python"
-    repo_url: str = ""
 
 
 @router.get("")
@@ -72,6 +66,21 @@ async def get_project(project_id: str, current_user: dict = Depends(get_current_
     return doc
 
 
+def _encrypt_token(token: str) -> str:
+    if not token:
+        return ""
+    try:
+        from cryptography.fernet import Fernet
+        from config import settings
+        import base64
+        key = settings.encryption_key.encode()
+        key = base64.urlsafe_b64encode(key.ljust(32)[:32])
+        f = Fernet(key)
+        return f.encrypt(token.encode()).decode()
+    except Exception:
+        import base64
+        return base64.b64encode(token.encode()).decode()
+
 @router.post("", status_code=201)
 async def create_project(
     body: CreateProjectRequest,
@@ -97,6 +106,15 @@ async def create_project(
         "last_activity": "just now",
         "created_at": datetime.utcnow().isoformat(),
     }
+    
+    if body.github_token:
+        project_doc["github_token_encrypted"] = _encrypt_token(body.github_token)
+    if body.jira_token:
+        project_doc["jira_token_encrypted"] = _encrypt_token(body.jira_token)
+    if body.slack_token:
+        project_doc["slack_token_encrypted"] = _encrypt_token(body.slack_token)
+    if body.llm_api_key:
+        project_doc["llm_api_key_encrypted"] = _encrypt_token(body.llm_api_key)
 
     if projects is None:
         return {"id": "new-mock-id", **project_doc}
@@ -122,3 +140,40 @@ async def delete_project(project_id: str, current_user: dict = Depends(get_curre
         })
     except Exception:
         pass
+
+
+@router.put("/{project_id}/integrations")
+async def update_project_integrations(
+    project_id: str,
+    body: UpdateProjectIntegrationsRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    if current_user.get("role") not in ("admin",):
+        raise HTTPException(status_code=403, detail="Only admins can update projects")
+
+    projects = get_collection("projects")
+    if projects is None:
+        return {"status": "ok"}
+
+    update_fields = {}
+    if body.github_token is not None:
+        update_fields["github_token_encrypted"] = _encrypt_token(body.github_token)
+    if body.jira_token is not None:
+        update_fields["jira_token_encrypted"] = _encrypt_token(body.jira_token)
+    if body.slack_token is not None:
+        update_fields["slack_token_encrypted"] = _encrypt_token(body.slack_token)
+    if body.llm_api_key is not None:
+        update_fields["llm_api_key_encrypted"] = _encrypt_token(body.llm_api_key)
+
+    if not update_fields:
+        return {"status": "ok"}
+
+    try:
+        await projects.update_one(
+            {"_id": ObjectId(project_id), "workspace_id": current_user.get("workspace_id")},
+            {"$set": update_fields}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update integrations: {str(e)}")
+
+    return {"status": "updated"}

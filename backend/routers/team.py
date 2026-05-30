@@ -1,12 +1,12 @@
 """Team management router — invite, list, remove members."""
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from datetime import datetime
 from typing import Literal
 from bson import ObjectId
 
 from auth import get_current_user
 from database import get_collection
+from schemas.team import InviteRequest, UpdateRoleRequest
 
 router = APIRouter(prefix="/team", tags=["team"])
 
@@ -17,10 +17,6 @@ MOCK_MEMBERS = [
     {"id": "t4", "name": "Priya Patel", "email": "priya.patel@company.com", "role": "engineer", "avatar": "PP", "joined_at": "2024-03-20", "last_active": "30 min ago", "queries_count": 156},
 ]
 
-
-class InviteRequest(BaseModel):
-    email: str
-    role: Literal["engineer", "viewer"] = "engineer"
 
 
 @router.get("/members")
@@ -114,16 +110,13 @@ async def remove_member(
 @router.patch("/members/{member_id}/role")
 async def update_member_role(
     member_id: str,
-    body: dict,
+    body: UpdateRoleRequest,
     current_user: dict = Depends(get_current_user),
 ):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can change roles")
 
-    new_role = body.get("role")
-    if new_role not in ("admin", "engineer", "viewer"):
-        raise HTTPException(status_code=400, detail="Invalid role")
-
+    new_role = body.role
     users = get_collection("users")
     if users is not None:
         try:

@@ -1,19 +1,14 @@
 """Workspaces router — multi-tenant workspace management."""
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from datetime import datetime
 from bson import ObjectId
 
 from auth import get_current_user
 from database import get_collection
+from schemas.workspaces import UpdateWorkspaceRequest
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
-
-class UpdateWorkspaceRequest(BaseModel):
-    name: str = None
-    description: str = None
-    domain: str = None
 
 
 @router.get("")

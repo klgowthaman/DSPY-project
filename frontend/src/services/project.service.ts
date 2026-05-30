@@ -20,12 +20,30 @@ export const projectService = {
     }
   },
 
-  async create(payload: { name: string; description?: string; language?: string; repo_url?: string }) {
+  async create(payload: { 
+    name: string; 
+    description?: string; 
+    language?: string; 
+    repo_url?: string;
+    github_token?: string;
+    jira_token?: string;
+    slack_token?: string;
+  }) {
     const { data } = await api.post('/projects', payload);
     return data;
   },
 
   async delete(id: string) {
     await api.delete(`/projects/${id}`);
+  },
+
+  async updateIntegrations(id: string, payload: {
+    github_token?: string;
+    jira_token?: string;
+    slack_token?: string;
+    llm_api_key?: string;
+  }) {
+    const { data } = await api.put(`/projects/${id}/integrations`, payload);
+    return data;
   },
 };

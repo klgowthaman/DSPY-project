@@ -5,7 +5,15 @@ import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 
 const AppLayout: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-bg-primary">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500"></div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

@@ -5,6 +5,9 @@ Uses MIPROv2-style optimization and multi-source reasoning.
 import logging
 from typing import List, Dict, Any, AsyncGenerator
 import json
+import json
+import requests
+from urllib.parse import urlparse
 from config import settings
 from vector_store import semantic_search
 
@@ -15,14 +18,15 @@ logger = logging.getLogger(__name__)
 # DSPy Setup
 # ============================================================
 
-def setup_dspy():
+def setup_dspy(llm_api_key: str = None):
     """Initialize DSPy with the configured LLM."""
     try:
         import dspy
-        if settings.openai_api_key and settings.openai_api_key != "sk-your-openai-api-key-here":
+        api_key_to_use = llm_api_key if llm_api_key else settings.openai_api_key
+        if api_key_to_use and api_key_to_use != "sk-your-openai-api-key-here":
             lm = dspy.LM(
                 model=f"openai/{settings.openai_model}",
-                api_key=settings.openai_api_key,
+                api_key=api_key_to_use,
             )
             dspy.configure(lm=lm)
             logger.info(f"✅ DSPy configured with OpenAI {settings.openai_model}")
@@ -89,6 +93,9 @@ async def run_agent_query(
     question: str,
     workspace_id: str,
     workspace_name: str = "",
+    github_token: str = "",
+    repo_url: str = "",
+    llm_api_key: str = None,
 ) -> AsyncGenerator[str, None]:
     """
     Run the DSPy agent and stream results as Server-Sent Events.
@@ -129,8 +136,18 @@ async def run_agent_query(
     # Step 4: Build context string
     context_str = _build_context_string(context_docs)
 
+    # Fetch live GitHub data if token is available
+    if github_token and repo_url:
+        step = f"Fetching live data from GitHub ({repo_url})"
+        reasoning_steps.append(step)
+        yield _sse_event("reasoning", {"step": step, "index": len(reasoning_steps)})
+        
+        live_github_data = _fetch_github_context(repo_url, github_token)
+        if live_github_data:
+            context_str += f"\n\n{live_github_data}"
+
     # Step 5: Run DSPy or mock
-    dspy_available = setup_dspy()
+    dspy_available = setup_dspy(llm_api_key=llm_api_key)
 
     answer = ""
     confidence = 87
@@ -212,6 +229,51 @@ def _build_context_string(docs: List[Dict]) -> str:
             f"[{i}] Source: {source} | {title} ({date})\n{content[:500]}"
         )
     return "\n\n".join(parts)
+
+
+def _fetch_github_context(repo_url: str, token: str) -> str:
+    """Fetch recent issues and PRs from GitHub API to provide live context."""
+    if not repo_url or not token:
+        return ""
+        
+    try:
+        path = urlparse(repo_url).path.strip('/')
+        parts = path.split('/')
+        if len(parts) < 2:
+            return ""
+            
+        owner, repo = parts[0], parts[1]
+        if repo.endswith('.git'):
+            repo = repo[:-4]
+            
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/issues?state=all&per_page=5"
+        resp = requests.get(api_url, headers=headers, timeout=5)
+        
+        if resp.status_code != 200:
+            logger.warning(f"Failed to fetch GitHub context: {resp.status_code} {resp.text}")
+            return ""
+            
+        issues = resp.json()
+        if not issues:
+            return "Live GitHub Context: No recent issues or PRs found."
+            
+        context_lines = ["--- LIVE GITHUB CONTEXT ---"]
+        for item in issues:
+            kind = "PR" if "pull_request" in item else "Issue"
+            state = item.get("state", "unknown")
+            title = item.get("title", "")
+            body = item.get("body", "") or ""
+            context_lines.append(f"[{kind} #{item.get('number')}] ({state}): {title}\n{body[:200]}...")
+            
+        return "\n\n".join(context_lines)
+    except Exception as e:
+        logger.error(f"Error fetching live GitHub context: {e}")
+        return ""
 
 
 def _build_citations(docs: List[Dict]) -> List[Dict]:

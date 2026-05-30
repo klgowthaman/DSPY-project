@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GitBranch, Ticket, Hash, Star, ArrowRight, Activity, Plus } from 'lucide-react';
 import { mockProjects } from '../data/mockData';
 import { Badge } from '../components/ui';
+import { projectService } from '../services/project.service';
 
 const langColor: Record<string, string> = {
   'Go': '#00ADD8', 'Python': '#3776AB', 'TypeScript': '#3178C6', 'Rust': '#CE422B',
@@ -11,7 +12,8 @@ const langColor: Record<string, string> = {
 
 const ProjectsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState(mockProjects);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '', language: 'Go' });
 
@@ -21,24 +23,28 @@ const ProjectsPage: React.FC = () => {
     return 'red';
   };
 
-  const handleAddProject = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    projectService.list().then(data => {
+      setProjects(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProject.name.trim()) return;
-    const project = {
-      id: `p${Date.now()}`,
-      name: newProject.name.trim(),
-      description: newProject.description.trim() || 'No description provided.',
-      language: newProject.language,
-      stars: 0,
-      lastActivity: 'just now',
-      status: 'healthy' as const,
-      prCount: 0,
-      jiraCount: 0,
-      slackActivity: 0,
-    };
-    setProjects(prev => [project, ...prev]);
-    setNewProject({ name: '', description: '', language: 'Go' });
-    setAddOpen(false);
+    try {
+      const created = await projectService.create({
+        name: newProject.name.trim(),
+        description: newProject.description.trim() || 'No description provided.',
+      });
+      setProjects(prev => [created, ...prev]);
+      setNewProject({ name: '', description: '', language: 'Go' });
+      setAddOpen(false);
+      navigate(`/projects/${created.id}`);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -53,7 +59,10 @@ const ProjectsPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {loading ? (
+        <div className="p-12 text-center text-text-secondary animate-pulse">Loading projects...</div>
+      ) : (
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
         {projects.length === 0 ? (
           <div className="col-span-full card p-12 text-center border-dashed border-white/10 mt-4">
             <GitBranch size={32} className="text-text-muted mx-auto mb-4" />
@@ -128,6 +137,7 @@ const ProjectsPage: React.FC = () => {
           ))
         )}
       </div>
+      )}
 
       {/* Add Project Modal */}
       <AnimatePresence>
@@ -139,12 +149,16 @@ const ProjectsPage: React.FC = () => {
               exit={{ opacity: 0, scale: 0.95 }}
               className="glass rounded-2xl p-8 max-w-md w-full mx-4 border border-white/10"
             >
-              <h3 className="font-bold text-lg mb-2 text-text-primary">Add Project Repository</h3>
-              <p className="text-sm text-text-secondary mb-6">Index a new codebase repository for the AI Reasoning Agent.</p>
+              <h3 className="font-bold text-lg mb-2 text-text-primary">
+                Create New Project
+              </h3>
+              <p className="text-sm text-text-secondary mb-6">
+                Configure your project details.
+              </p>
               
               <form onSubmit={handleAddProject} className="space-y-4">
                 <div>
-                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">Repository Name</label>
+                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">Project Name</label>
                   <input
                     required
                     type="text"
@@ -163,26 +177,12 @@ const ProjectsPage: React.FC = () => {
                     className="w-full h-24 bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-blue/40 transition-all text-text-primary placeholder:text-text-muted resize-none"
                   />
                 </div>
-                <div>
-                  <label className="text-xs text-text-secondary mb-1.5 block font-medium">Primary Language</label>
-                  <select
-                    value={newProject.language}
-                    onChange={e => setNewProject({ ...newProject, language: e.target.value })}
-                    className="w-full bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none text-text-primary"
-                  >
-                    <option value="Go">Go</option>
-                    <option value="Python">Python</option>
-                    <option value="TypeScript">TypeScript</option>
-                    <option value="Rust">Rust</option>
-                  </select>
-                </div>
-                
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-4 border-t border-white/10 mt-4">
                   <button type="button" onClick={() => setAddOpen(false)} className="btn-secondary flex-1 py-2">
                     Cancel
                   </button>
                   <button type="submit" className="btn-primary flex-1 py-2 flex items-center justify-center gap-1.5">
-                    <Plus size={14} /> Add Repository
+                    <Plus size={14} /> Create Project
                   </button>
                 </div>
               </form>

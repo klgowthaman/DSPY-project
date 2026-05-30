@@ -1,34 +1,15 @@
 """Auth router — login and signup endpoints."""
 from fastapi import APIRouter, HTTPException, status, Depends
-from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from bson import ObjectId
 import logging
 
 from auth import hash_password, verify_password, create_access_token, get_current_user
 from database import get_collection
+from schemas.auth import LoginRequest, SignupRequest, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-class SignupRequest(BaseModel):
-    name: str
-    email: str
-    password: str
-    company: str = ""
-    workspace_name: str = "My Workspace"
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: dict
 
 
 # -------------------------------------------------------

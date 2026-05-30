@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, GitBranch, Ticket, Hash, Star, Activity,
-  GitMerge, AlertCircle, MessageSquare, RefreshCw, Sparkles
+  GitMerge, AlertCircle, MessageSquare, RefreshCw, Sparkles, Key, Save, Check
 } from 'lucide-react';
 import { mockProjects } from '../data/mockData';
 import { Badge, GlassCard } from '../components/ui';
+import { projectService } from '../services/project.service';
 
 const mockPRs = [
   { id: 'pr1', title: 'Switch to polling-based webhook fallback', number: 847, status: 'merged', author: 'alexc', date: 'Feb 15' },
@@ -30,9 +31,30 @@ const mockSlack = [
 const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'prs' | 'jira' | 'slack'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'prs' | 'jira' | 'slack' | 'integrations'>('overview');
+  const [project, setProject] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
+  const [integrationsForm, setIntegrationsForm] = useState({
+    githubToken: '',
+    jiraToken: '',
+    slackToken: '',
+    llmApiKey: '',
+  });
+  const [savingIntegrations, setSavingIntegrations] = useState(false);
+  const [integrationSuccess, setIntegrationSuccess] = useState(false);
 
-  const project = mockProjects.find(p => p.id === id) || mockProjects[0];
+  React.useEffect(() => {
+    if (id) {
+      projectService.get(id).then(data => {
+        setProject(data);
+        setLoading(false);
+      });
+    }
+  }, [id]);
+
+  if (loading) return <div className="p-8 text-center text-text-secondary animate-pulse">Loading project details...</div>;
+  if (!project) return <div className="p-8 text-center text-red-400">Project not found</div>;
 
   const statusVariant = (s: string): 'green' | 'orange' | 'red' => {
     if (s === 'healthy' || s === 'merged' || s === 'Done') return 'green';
@@ -40,7 +62,28 @@ const ProjectDetailPage: React.FC = () => {
     return 'red';
   };
 
-  const tabs = ['overview', 'prs', 'jira', 'slack'] as const;
+  const tabs = ['overview', 'prs', 'jira', 'slack', 'integrations'] as const;
+
+  const handleSaveIntegrations = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    setSavingIntegrations(true);
+    try {
+      await projectService.updateIntegrations(id, {
+        github_token: integrationsForm.githubToken || undefined,
+        jira_token: integrationsForm.jiraToken || undefined,
+        slack_token: integrationsForm.slackToken || undefined,
+        llm_api_key: integrationsForm.llmApiKey || undefined,
+      });
+      setIntegrationSuccess(true);
+      setIntegrationsForm({ githubToken: '', jiraToken: '', slackToken: '', llmApiKey: '' });
+      setTimeout(() => setIntegrationSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingIntegrations(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -208,6 +251,83 @@ const ProjectDetailPage: React.FC = () => {
                 <p className="text-sm text-text-secondary">{thread.text}</p>
               </div>
             ))}
+          </div>
+        )}
+        {activeTab === 'integrations' && (
+          <div className="card p-6 max-w-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-blue/20 to-accent-purple/20 flex items-center justify-center">
+                <Key size={18} className="text-accent-blue" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base">API Integrations</h3>
+                <p className="text-xs text-text-secondary">Configure credentials to allow AI context retrieval for this project.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveIntegrations} className="space-y-4">
+              <div>
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">GitHub Personal Access Token</label>
+                <input
+                  type="password"
+                  placeholder="ghp_... (Leave blank to keep existing)"
+                  value={integrationsForm.githubToken}
+                  onChange={e => setIntegrationsForm({ ...integrationsForm, githubToken: e.target.value })}
+                  className="w-full bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-blue/40 transition-all text-text-primary"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">Jira API Token</label>
+                <input
+                  type="password"
+                  placeholder="ATATT3... (Leave blank to keep existing)"
+                  value={integrationsForm.jiraToken}
+                  onChange={e => setIntegrationsForm({ ...integrationsForm, jiraToken: e.target.value })}
+                  className="w-full bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-blue/40 transition-all text-text-primary"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">Slack Bot Token</label>
+                <input
+                  type="password"
+                  placeholder="xoxb-... (Leave blank to keep existing)"
+                  value={integrationsForm.slackToken}
+                  onChange={e => setIntegrationsForm({ ...integrationsForm, slackToken: e.target.value })}
+                  className="w-full bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-blue/40 transition-all text-text-primary"
+                />
+              </div>
+              <div className="pt-4 border-t border-white/10 mt-4">
+                <label className="text-xs text-accent-purple mb-1.5 block font-bold">Custom LLM API Key (Optional)</label>
+                <p className="text-[10px] text-text-muted mb-2">Override the global LLM key specifically for queries regarding this project.</p>
+                <input
+                  type="password"
+                  placeholder="sk-... (Leave blank to keep existing or use global)"
+                  value={integrationsForm.llmApiKey}
+                  onChange={e => setIntegrationsForm({ ...integrationsForm, llmApiKey: e.target.value })}
+                  className="w-full bg-bg-elevated border border-white/8 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-purple/40 transition-all text-text-primary"
+                />
+              </div>
+
+              <div className="flex items-center gap-4 pt-4 mt-2">
+                <button 
+                  type="submit" 
+                  disabled={savingIntegrations}
+                  className="btn-primary flex items-center gap-2 py-2 px-6"
+                >
+                  {savingIntegrations ? (
+                    <RefreshCw size={14} className="animate-spin" />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                  Save Integrations
+                </button>
+                {integrationSuccess && (
+                  <span className="text-xs text-accent-green flex items-center gap-1 animate-fade-in">
+                    <Check size={14} /> Keys encrypted and saved successfully.
+                  </span>
+                )}
+              </div>
+            </form>
           </div>
         )}
       </motion.div>
